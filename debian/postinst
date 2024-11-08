@@ -1,0 +1,30 @@
+#!/bin/sh
+
+set -e
+
+NAME=slimbook-qc71
+PACKAGE_NAME=$NAME-dkms
+DEB_NAME=$(echo $PACKAGE_NAME | sed 's,_,-,')
+CVERSION="1.0"
+ARCH=`dpkg-architecture -qDEB_BUILD_GNU_CPU`
+POSTINST=/usr/lib/dkms/common.postinst
+
+case "$1" in
+	configure)
+		if [ -f $POSTINST ]; then
+			"$POSTINST" "$NAME" "$VERSION" "/usr/share/$PACKAGE_NAME" "$ARCH" "$2"
+		fi
+	;;
+
+	abort-upgrade|abort-remove|abort-deconfigure)
+	;;
+
+	*)
+		echo "postinst called with unknown argument \`$1'" >&2
+		exit 1
+	;;
+esac
+
+#DEBHELPER#
+
+exit 0
