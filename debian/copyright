@@ -1,0 +1,12 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: slimbook-yt6801-dkms
+Upstream-Contact: <dev@slimbook.es>
+Source: <https://slimbook.es>
+
+Files: debian
+Copyright: 2024 Slimbook <dev@slimbook.es>
+License: GPL-3
+
+Files: src
+Copyright: Copyright (c) 2021 Motorcomm
+License: GPL-2

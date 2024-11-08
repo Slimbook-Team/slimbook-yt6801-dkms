@@ -1,0 +1,17 @@
+Source: slimbook-yt6801-dkms
+Section: misc
+Priority: optional
+Maintainer: Slimbook <dev@slimbook.es>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.0
+Rules-Requires-Root: no
+Homepage: https://slimbook.es
+
+Package: slimbook-yt6801-dkms
+Architecture: amd64
+Depends: dkms (>= 1.95), ${misc:Depends}
+Description: Motorcomm YT6801 Gigabit ethernet driver
+ DKMS module for Motorcomm YT6801 Gigabit ethernet driver
+
+
+
