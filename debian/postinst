@@ -2,10 +2,10 @@
 
 set -e
 
-NAME=slimbook-qc71
+NAME=slimbook-yt6801
 PACKAGE_NAME=$NAME-dkms
 DEB_NAME=$(echo $PACKAGE_NAME | sed 's,_,-,')
-CVERSION="1.0"
+VERSION=1.0
 ARCH=`dpkg-architecture -qDEB_BUILD_GNU_CPU`
 POSTINST=/usr/lib/dkms/common.postinst
 

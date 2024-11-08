@@ -5,3 +5,11 @@ PKGDIR=debian/tmp
 %:
 	dh $@
 
+override_dh_auto_clean:
+	#dummy
+
+override_dh_auto_build:
+	#dummy
+
+override_dh_auto_install:
+	#dummy
