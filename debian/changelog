@@ -1,3 +1,9 @@
+slimbook-yt6801-dkms (1.0.29+slimbook6) noble; urgency=medium
+
+  * Fix for cross-compile 
+
+ -- Slimbook <dev@slimbook.es>  Thu, 09 Jan 2025 19:01:15 +0100
+
 slimbook-yt6801-dkms (1.0.29+slimbook5) noble; urgency=medium
 
   * Initial release
