@@ -1,3 +1,9 @@
+slimbook-yt6801-dkms (1.0.29+slimbook6~bpo22.04) jammy; urgency=medium
+
+  * jammy backport
+
+ -- Slimbook <dev@slimbook.es>  Tue, 28 Jan 2025 11:41:12 +0100
+
 slimbook-yt6801-dkms (1.0.29+slimbook6) noble; urgency=medium
 
   * Fix for cross-compile 
