@@ -1,3 +1,9 @@
+slimbook-yt6801-dkms (1.0.29+slimbook7) noble; urgency=medium
+
+  * Fix deprecated function on 6.15 kernels
+
+ -- Slimbook <dev@slimbook.es>  Thu, 05 Jun 2025 22:46:13 +0200
+
 slimbook-yt6801-dkms (1.0.29+slimbook6) noble; urgency=medium
 
   * Fix for cross-compile 
