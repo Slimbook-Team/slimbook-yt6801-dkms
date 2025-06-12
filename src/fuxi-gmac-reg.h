@@ -730,8 +730,12 @@
 #define DMA_MR_TXPR_LEN         1
 #define DMA_MR_INTM_POS         16
 #define DMA_MR_INTM_LEN         2
+#define DMA_MA_INTM_EDGE             0
+#define DMA_MA_INTM_LEVEL            1
+#define DMA_MA_INTM_LEVLE_ENHANCE    2
 #define DMA_MR_QUREAD_POS       19
 #define DMA_MR_QUREAD_LEN       1
+#define DMA_MR_QUREAD_EN        1
 #define DMA_MR_TNDF_POS         20
 #define DMA_MR_TNDF_LEN         2
 #define DMA_MR_RNDF_POS         22
@@ -980,6 +984,62 @@
 #define RX_NORMAL_DESC3_WB_CE_POS                24
 #define RX_NORMAL_DESC3_WB_CE_LEN                1
 
+/*
+ * When this bit is set, it indicates that the packet length exceeds the specified maximum
+ * Ethernet size of 1518, 1522, or 2000 bytes (9018 or 9022 bytes if jumbo packet enable is set).
+ * Note: Giant packet indicates only the packet length. It does not cause any packet truncation.
+ */
+#define RX_NORMAL_DESC3_WB_GP_POS                23
+#define RX_NORMAL_DESC3_WB_GP_LEN                1
+
+/*
+ * When this bit is set, it indicates that the Receive Watchdog Timer has expired while receiving
+ * the current packet. The current packet is truncated after watchdog timeout.
+ */
+#define RX_NORMAL_DESC3_WB_RWT_POS                22
+#define RX_NORMAL_DESC3_WB_RWT_LEN                1
+
+/*
+ * When this bit is set, it indicates that the received packet is damaged because of buffer
+ * overflow in Rx FIFO.
+ * Note: This bit is set only when the DMA transfers a partial packet to the application. This
+ * happens only when the Rx FIFO is operating in the threshold mode. In the store-and-forward
+ * mode, all partial packets are dropped completely in Rx FIFO.
+ */
+#define RX_NORMAL_DESC3_WB_OE_POS                21
+#define RX_NORMAL_DESC3_WB_OE_LEN                1
+
+/*
+ * When this bit is set, it indicates that the gmii_rxer_i signal is asserted while the gmii_rxdv_i
+ * signal is asserted during packet reception. This error also includes carrier extension error in
+ * the GMII and half-duplex mode. Error can be of less or no extension, or error (rxd!= 0f) during
+ * extension
+ */
+#define RX_NORMAL_DESC3_WB_RE_POS                20
+#define RX_NORMAL_DESC3_WB_RE_LEN                1
+
+/*
+ * When this bit is set, it indicates that the received packet has a non-integer multiple of bytes
+ * (odd nibbles). This bit is valid only in the MII Mode
+ */
+#define RX_NORMAL_DESC3_WB_DE_POS                19
+#define RX_NORMAL_DESC3_WB_DE_LEN                1
+
+/*
+ * When this bit is set, it indicates the logical OR of the following bits:
+ *  RDES3[24]: CRC Error
+ *  RDES3[19]: Dribble Error
+ *  RDES3[20]: Receive Error
+ *  RDES3[22]: Watchdog Timeout
+ *  RDES3[21]: Overflow Error
+ *  RDES3[23]: Giant Packet
+ *  RDES2[17]: Destination Address Filter Fail, when Flexible RX Parser is enabled
+ *  RDES2[16]: SA Address Filter Fail, when Flexible RX Parser is enabled
+ * This field is valid only when the LD bit of RDES3 is set
+ */
+#define RX_NORMAL_DESC3_WB_ES_POS                15
+#define RX_NORMAL_DESC3_WB_ES_LEN                1
+
 #define RX_DESC3_L34T_IPV4_TCP                   1
 #define RX_DESC3_L34T_IPV4_UDP                   2
 #define RX_DESC3_L34T_IPV4_ICMP                  3
@@ -1146,10 +1206,17 @@
 #define PHY_INT_MASK_LINK_DOWN_LEN      1
 #endif
 #define REG_MII_INT_STATUS              0x13    /* Interrupt status register   */
+#ifdef AISC_MODE
+#define PHY_INT_STAT_LINK_UP_POS        10
+#define PHY_INT_STAT_LINK_UP_LEN        1
+#define PHY_INT_STAT_LINK_DOWN_POS      11
+#define PHY_INT_STAT_LINK_DOWN_LEN      1
+#else
 #define PHY_INT_STAT_LINK_UP_POS        1
 #define PHY_INT_STAT_LINK_UP_LEN        1
 #define PHY_INT_STAT_LINK_DOWN_POS      0
 #define PHY_INT_STAT_LINK_DOWN_LEN      1
+#endif
 #define REG_MII_DOWNG_CTRL              0x14    /* Speed auto downgrade control*/
 #define REG_MII_RERRCOUNTER             0x15    /* Receive error counter       */
 
@@ -1163,8 +1230,8 @@
  */
 #define FXGMAC_ADVERTISE_SLCT           0x001f  /* Selector bits               */
 #define FXGMAC_ADVERTISE_CSMA           0x0001  /* Only selector supported     */
-#define FXGMAC_ADVERTISE_1000FULL       0x0004  /* trt fir 1000BASE-T full duplex */
-#define FXGMAC_ADVERTISE_1000HALF       0x0008  /* try for 1000BASE-T half duplex */
+//#define FXGMAC_ADVERTISE_1000FULL       0x0004  /* Try for 1000BASE-T full duplex */
+//#define FXGMAC_ADVERTISE_1000HALF       0x0008  /* Try for 1000BASE-T half duplex */
 #define FXGMAC_ADVERTISE_10HALF         0x0020  /* Try for 10mbps half-duplex  */
 #define FXGMAC_ADVERTISE_10FULL         0x0040  /* Try for 10mbps full-duplex  */
 #define FXGMAC_ADVERTISE_100HALF        0x0080  /* Try for 100mbps half-duplex */
@@ -1178,10 +1245,10 @@
 #define FXGMAC_ADVERTISE_NPAGE          0x8000  /* Next page bit               */
 
 /* 1000BASE-T Control register(0x09) */
-#define REG_BIT_ADVERTISE_1000FULL      0x0200  /* Advertise 1000BASE-T full duplex */
-#define REG_BIT_ADVERTISE_1000HALF      0x0100  /* Advertise 1000BASE-T half duplex */
+#define FXGMAC_ADVERTISE_1000FULL      0x0200  /* Advertise 1000BASE-T full duplex */
+#define FXGMAC_ADVERTISE_1000HALF      0x0100  /* Advertise 1000BASE-T half duplex */
 
-#define REG_BIT_ADVERTISE_1000_CAP      (REG_BIT_ADVERTISE_1000FULL | REG_BIT_ADVERTISE_1000HALF)
+#define REG_BIT_ADVERTISE_1000_CAP      (FXGMAC_ADVERTISE_1000FULL | FXGMAC_ADVERTISE_1000HALF)
 #define REG_BIT_ADVERTISE_100_10_CAP    (FXGMAC_ADVERTISE_100FULL | FXGMAC_ADVERTISE_100HALF | FXGMAC_ADVERTISE_10FULL | FXGMAC_ADVERTISE_10HALF )
 
 #ifndef SPEED_1000M
@@ -1222,6 +1289,10 @@
 #define FXGMAC_EPHY_SMI_SEL_SDS_QSGMII                     0x02
 #define FXGMAC_EPHY_SMI_SEL_SDS_SGMII                      0x03
 
+#define REG_MII_EXT_AFE_CONTROL_REGISTER3                0x12
+#define REG_MII_EXT_AFE_CONTROL_CLKDAC_AON_POS           13
+#define REG_MII_EXT_AFE_CONTROL_CLKDAC_AON_LEN           1
+#define REG_MII_EXT_AFE_CONTROL_CLKDAC_AON_ON            1
 #define REG_MII_EXT_ANALOG_CFG3                          0x52
 #define MII_EXT_ANALOG_CFG3_ADC_START_CFG_POS            14
 #define MII_EXT_ANALOG_CFG3_ADC_START_CFG_LEN            2
@@ -1887,6 +1958,14 @@
 #define PM_CTRLSTAT_PME_STAT_LEN                1
 
 #define REG_DEVICE_CTRL1                        0x78
+#define DEVICE_CTRL1_MPS_POS                    5     //MPS: max payload size
+#define DEVICE_CTRL1_MPS_LEN                    3
+#define DEVICE_CTRL1_MPS_128B                   0
+#define DEVICE_CTRL1_MPS_256B                   1
+#define DEVICE_CTRL1_MPS_512B                   2
+#define DEVICE_CTRL1_MPS_1024B                  3
+#define DEVICE_CTRL1_MPS_2048B                  4
+#define DEVICE_CTRL1_MPS_4096B                  5
 #define DEVICE_CTRL1_CONTROL_POS                0
 #define DEVICE_CTRL1_CONTROL_LEN                16
 #define DEVICE_CTRL1_STATUS_POS                 16
