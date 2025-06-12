@@ -51,6 +51,7 @@ int fxgmac_phy_force_mode(struct fxgmac_pdata *pdata)
     regval = FXGMAC_SET_REG_BITS(regval, PHY_CR_SPEED_SEL_H_POS, PHY_CR_SPEED_SEL_H_LEN, high_bit);
     regval = FXGMAC_SET_REG_BITS(regval, PHY_CR_SPEED_SEL_L_POS, PHY_CR_SPEED_SEL_L_LEN, low_bit);
     regval = FXGMAC_SET_REG_BITS(regval, PHY_CR_DUPLEX_POS, PHY_CR_DUPLEX_LEN, pdata->phy_duplex);
+    regval = FXGMAC_SET_REG_BITS(regval, PHY_CR_RESET_POS, PHY_CR_RESET_LEN, 1);
     ret = hw_ops->write_ephy_reg(pdata, REG_MII_BMCR, regval);
     return ret;
 }
@@ -115,119 +116,10 @@ void fxgmac_set_phy_link_ksettings(struct fxgmac_pdata *pdata)
     pdata->phy_duplex = pdata->expansion.pre_phy_duplex;
     pdata->phy_autoeng = pdata->expansion.pre_phy_autoneg;
 
-    if (pdata->phy_autoeng)
+    if (pdata->phy_autoeng || (!pdata->phy_autoeng && pdata->phy_speed == SPEED_1000))
         hw_ops->phy_config(pdata);
     else
         fxgmac_phy_force_mode(pdata);
-}
-
-/*
- * input: lport
- * output:
- *  cap_mask, bit definitions:
- *      pause capbility and 100/10 capbilitys follow the definition of mii reg4.
- *      for 1000M capability, bit0=1000M half; bit1=1000M full, refer to mii reg9.[9:8].
- */
-int fxgmac_ephy_autoneg_ability_get(struct fxgmac_pdata *pdata, unsigned int *cap_mask)
-{
-    struct fxgmac_hw_ops *hw_ops = &pdata->hw_ops;
-    unsigned int val;
-    unsigned int reg;
-
-    if((!hw_ops->read_ephy_reg) || (!hw_ops->write_ephy_reg))
-        return -1;
-
-    reg = REG_MII_ADVERTISE;
-    if(hw_ops->read_ephy_reg(pdata, reg, &val) < 0)
-        goto busy_exit;
-
-    //DPRINTK("fxgmac_ephy_autoneg_ability_get, reg %d=0x%04x\n", reg, val);
-
-    if(FXGMAC_ADVERTISE_10HALF & val)
-    {
-        *cap_mask |= FXGMAC_ADVERTISE_10HALF;
-    }
-    else
-    {
-        *cap_mask &= ~FXGMAC_ADVERTISE_10HALF;
-    }
-
-    if(FXGMAC_ADVERTISE_10FULL & val)
-    {
-        *cap_mask |= FXGMAC_ADVERTISE_10FULL;
-    }
-    else
-    {
-        *cap_mask &= ~FXGMAC_ADVERTISE_10FULL;
-    }
-
-    if(FXGMAC_ADVERTISE_100HALF & val)
-    {
-        *cap_mask |= FXGMAC_ADVERTISE_100HALF;
-    }
-    else
-    {
-        *cap_mask &= ~FXGMAC_ADVERTISE_100HALF;
-    }
-
-    if(FXGMAC_ADVERTISE_100FULL & val)
-    {
-        *cap_mask |= FXGMAC_ADVERTISE_100FULL;
-    }
-    else
-    {
-        *cap_mask &= ~FXGMAC_ADVERTISE_100FULL;
-    }
-
-    if(FXGMAC_ADVERTISE_PAUSE_CAP & val)
-    {
-        *cap_mask |= FXGMAC_ADVERTISE_PAUSE_CAP;
-    }
-    else
-    {
-        *cap_mask &= ~FXGMAC_ADVERTISE_PAUSE_CAP;
-    }
-
-    if(FXGMAC_ADVERTISE_PAUSE_ASYM & val)
-    {
-        *cap_mask |= FXGMAC_ADVERTISE_PAUSE_ASYM;
-    }
-    else
-    {
-        *cap_mask &= ~FXGMAC_ADVERTISE_PAUSE_ASYM;
-    }
-
-    reg = REG_MII_CTRL1000;
-    if(hw_ops->read_ephy_reg(pdata, reg, &val) < 0)
-        goto busy_exit;
-
-    //DPRINTK("fxgmac_ephy_autoneg_ability_get, reg %d=0x%04x\n", reg, val);
-    if(REG_BIT_ADVERTISE_1000HALF & val )
-    {
-        *cap_mask |= FXGMAC_ADVERTISE_1000HALF;
-    }
-    else
-    {
-        *cap_mask &= ~FXGMAC_ADVERTISE_1000HALF;
-    }
-
-    if(REG_BIT_ADVERTISE_1000FULL & val )
-    {
-        *cap_mask |= FXGMAC_ADVERTISE_1000FULL;
-    }
-    else
-    {
-        *cap_mask &= ~FXGMAC_ADVERTISE_1000FULL;
-    }
-
-    //DPRINTK("fxgmac_ephy_autoneg_ability_get done, 0x%08x.\n", *cap_mask);
-
-    return 0;
-
-busy_exit:
-    DPRINTK("fxgmac_ephy_autoneg_ability_get exit due to ephy reg access fail.\n");
-
-    return -1;
 }
 
 int fxgmac_ephy_soft_reset(struct fxgmac_pdata *pdata)
@@ -342,34 +234,11 @@ busy_exit:
     return ret;
 }
 
-#if 0
-void fxgmac_act_phy_link(struct fxgmac_pdata *pdata)
-{
-    struct net_device *netdev = pdata->netdev;
-
-    /* read-clear EPhy link change interrupt */
-    fxgmac_read_ephy_reg(pdata, REG_MII_INT_STATUS, NULL);//  clear  phy interrupt
-
-    if (pdata->expansion.phy_link) {
-            netif_carrier_on(netdev);
-            if (netif_running(netdev))
-        {
-                netif_tx_wake_all_queues(netdev);
-            DPRINTK("fuxi_phy now is link up, mac_speed=%d.\n",pdata->phy_speed);
-        }
-    } else {
-            netif_carrier_off(netdev);
-            netif_tx_stop_all_queues(netdev);
-            DPRINTK("fuxi_phy now is link down\n");
-    }
-}
-#endif
-
 /*
  * fxgmac_phy_update_link - update the phy link status
  * @adapter: pointer to the device adapter structure
  */
-static void fxgmac_phy_update_link(struct net_device *netdev)
+void fxgmac_phy_update_link(struct net_device *netdev)
 {
     struct fxgmac_pdata *pdata = netdev_priv(netdev);
     struct fxgmac_hw_ops *hw_ops = &pdata->hw_ops;
@@ -377,11 +246,20 @@ static void fxgmac_phy_update_link(struct net_device *netdev)
 
     regval = hw_ops->get_ephy_state(pdata);
     // We should make sure that PHY is done with the reset
-    if (regval & MGMT_EPHY_CTRL_STA_EPHY_RESET) {
+    if (!(regval & BIT(MGMT_EPHY_CTRL_RESET_POS)) &&
+        (pdata->expansion.dev_state != FXGMAC_DEV_CLOSE)) {
         pdata->expansion.phy_link = false;
         return;
     }
 
+    cur_speed = FXGMAC_GET_REG_BITS(regval,
+                        MGMT_EPHY_CTRL_STA_SPEED_POS,
+                        MGMT_EPHY_CTRL_STA_SPEED_LEN);
+    pdata->phy_speed = (cur_speed == 2) ? SPEED_1000 :
+                        (cur_speed == 1) ? SPEED_100 : SPEED_10;
+    pdata->phy_duplex = FXGMAC_GET_REG_BITS(regval,
+                        MGMT_EPHY_CTRL_STA_EPHY_DUPLEX_POS,
+                        MGMT_EPHY_CTRL_STA_EPHY_DUPLEX_LEN);
     cur_link = FXGMAC_GET_REG_BITS(regval,
                                 MGMT_EPHY_CTRL_STA_EPHY_LINKUP_POS,
                                 MGMT_EPHY_CTRL_STA_EPHY_LINKUP_LEN);
@@ -389,20 +267,23 @@ static void fxgmac_phy_update_link(struct net_device *netdev)
         hw_ops->read_ephy_reg(pdata, REG_MII_INT_STATUS, NULL);
         hw_ops->read_ephy_reg(pdata, REG_MII_INT_STATUS, NULL);
 
-        pdata->expansion.phy_link = cur_link;
-        if (pdata->expansion.phy_link) {
-            cur_speed = FXGMAC_GET_REG_BITS(regval,
-                                MGMT_EPHY_CTRL_STA_SPEED_POS,
-                                MGMT_EPHY_CTRL_STA_SPEED_LEN);
-            pdata->phy_speed = (cur_speed == 2) ? SPEED_1000 :
-                                (cur_speed == 1) ? SPEED_100 : SPEED_10;
-            pdata->phy_duplex = FXGMAC_GET_REG_BITS(regval,
-                                MGMT_EPHY_CTRL_STA_EPHY_DUPLEX_POS,
-                                MGMT_EPHY_CTRL_STA_EPHY_DUPLEX_LEN);
+        if (cur_link) {
+#ifdef FXGMAC_ASPM_ENABLED
+            if (fxgmac_aspm_action_linkup(pdata))
+                return;
+#endif
             hw_ops->config_mac_speed(pdata);
-
             hw_ops->enable_rx(pdata);
             hw_ops->enable_tx(pdata);
+            hw_ops->read_ephy_reg(pdata, REG_MII_LPA, &regval);
+            if (FXGMAC_GET_REG_BITS(regval, PHY_MII_LINK_PARNTNER_10FULL_POS, PHY_MII_LINK_PARNTNER_10FULL_LEN)
+                || FXGMAC_GET_REG_BITS(regval, PHY_MII_LINK_PARNTNER_10HALF_POS, PHY_MII_LINK_PARNTNER_10HALF_LEN))
+            {
+                pdata->support_10m_link = true;
+            }
+            pdata->expansion.pre_phy_speed = pdata->phy_speed;
+            pdata->expansion.pre_phy_duplex = pdata->phy_duplex;
+            pdata->expansion.pre_phy_autoneg = pdata->phy_autoeng;
             netif_carrier_on(pdata->netdev);
             if (netif_running(pdata->netdev))
             {
@@ -416,10 +297,22 @@ static void fxgmac_phy_update_link(struct net_device *netdev)
             netif_tx_stop_all_queues(pdata->netdev);
             pdata->phy_speed = SPEED_UNKNOWN;
             pdata->phy_duplex = DUPLEX_UNKNOWN;
+            pdata->support_10m_link = false;
             hw_ops->disable_rx(pdata);
             hw_ops->disable_tx(pdata);
+#ifdef FXGMAC_EPHY_LOOPBACK_DETECT_ENABLED
+            if (pdata->expansion.lb_cable_flag) {
+                hw_ops->clean_cable_loopback(pdata);
+                pdata->expansion.lb_cable_flag = 0;
+            }
+#endif
+
+#ifdef FXGMAC_ASPM_ENABLED
+            fxgmac_schedule_aspm_config_work(pdata);
+#endif
             dev_info(pdata->dev, "%s now is link down\n", netdev_name(pdata->netdev));
         }
+        pdata->expansion.phy_link = cur_link;
     }
 }
 
@@ -454,21 +347,6 @@ static void fxgmac_phy_link_poll(unsigned long data)
     }
     //DPRINTK("fxgmac_phy_timer polled,%d\n",cnt_polling);
 }
-
-#if 0
-void fxgmac_phy_timer_resume(struct fxgmac_pdata *pdata)
-{
-    if(NULL == pdata->netdev)
-    {
-        DPRINTK("fxgmac_phy_timer_resume, failed due to NULL netdev %lx\n",(unsigned long)(pdata->netdev));
-        return;
-    }
-
-    mod_timer(&pdata->expansion.phy_poll_tm,jiffies + HZ / 2);
-
-    DPRINTK("fxgmac_phy_timer_resume ok, fxgmac powerstate=%ld, netdev=%lx, tm=%lx\n", pdata->expansion.powerstate, (unsigned long)(pdata->netdev), (unsigned long)&pdata->expansion.phy_poll_tm);
-}
-#endif
 
 int fxgmac_phy_timer_init(struct fxgmac_pdata *pdata)
 {

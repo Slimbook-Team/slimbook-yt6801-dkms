@@ -382,7 +382,7 @@ static int fxgmac_set_rxfh(struct net_device *netdev, const u32 *indir,
 {
     struct fxgmac_pdata *pdata = netdev_priv(netdev);
     struct fxgmac_hw_ops *hw_ops = &pdata->hw_ops;
-    int i;
+    int i = 0;
     u32 reta_entries = fxgmac_rss_indir_size(netdev);
     int max_queues = FXGMAC_MAX_DMA_CHANNELS;
 
@@ -955,10 +955,11 @@ static int fxgmac_get_link_ksettings(struct net_device *netdev,
     u32 duplex, regval, link_status;
     u32 adv = 0xFFFFFFFF;
     int ret;
-
+#if 0
     ret = fxgmac_ephy_autoneg_ability_get(pdata, &adv);
     if (ret < 0)
         return -ETIMEDOUT;
+#endif
 
     ethtool_link_ksettings_zero_link_mode(cmd, supported);
     ethtool_link_ksettings_zero_link_mode(cmd, advertising);
@@ -995,7 +996,12 @@ static int fxgmac_get_link_ksettings(struct net_device *netdev,
         if (pdata->phy_autoeng)
             ethtool_link_ksettings_add_link_mode(cmd, advertising, Autoneg);
         else
-            clear_bit(ETHTOOL_LINK_MODE_Autoneg_BIT, cmd->link_modes.advertising);
+            goto FORCE_MODE;
+            //clear_bit(ETHTOOL_LINK_MODE_Autoneg_BIT, cmd->link_modes.advertising);
+
+        ret = hw_ops->read_ephy_reg(pdata, REG_MII_ADVERTISE, &adv);
+        if (ret < 0)
+                return ret;
 
         if (adv & FXGMAC_ADVERTISE_10HALF)
             ethtool_link_ksettings_add_link_mode(cmd, advertising, 10baseT_Half);
@@ -1005,10 +1011,16 @@ static int fxgmac_get_link_ksettings(struct net_device *netdev,
             ethtool_link_ksettings_add_link_mode(cmd, advertising, 100baseT_Half);
         if (adv & FXGMAC_ADVERTISE_100FULL)
             ethtool_link_ksettings_add_link_mode(cmd, advertising, 100baseT_Full);
+
+        ret = hw_ops->read_ephy_reg(pdata, REG_MII_CTRL1000, &adv);
+        if (ret < 0)
+                return ret;
+
         if (adv & FXGMAC_ADVERTISE_1000FULL)
             ethtool_link_ksettings_add_link_mode(cmd, advertising, 1000baseT_Full);
     }
     else {
+FORCE_MODE:
         clear_bit(ETHTOOL_LINK_MODE_Autoneg_BIT, cmd->link_modes.advertising);
         switch (pdata->phy_speed) {
             case SPEED_1000M:
@@ -1039,7 +1051,7 @@ static int fxgmac_get_link_ksettings(struct net_device *netdev,
     ret = hw_ops->read_ephy_reg(pdata, REG_MII_SPEC_STATUS, &regval);
     if (ret < 0)
 	return ret;
-    
+
     link_status = regval & (BIT(FXGMAC_EPHY_LINK_STATUS_BIT));
     if (link_status) {
         duplex = FXGMAC_GET_REG_BITS(regval, PHY_MII_SPEC_DUPLEX_POS, PHY_MII_SPEC_DUPLEX_LEN);
@@ -1056,57 +1068,29 @@ static int fxgmac_get_link_ksettings(struct net_device *netdev,
 static int fxgmac_set_link_ksettings(struct net_device *netdev,
 				    const struct ethtool_link_ksettings *cmd)
 {
-    u32 advertising, support, adv;
-    int ret;
-    struct fxphy_ag_adv;
+    u32 advertising, support;
     struct fxgmac_pdata *pdata = netdev_priv(netdev);
     struct fxgmac_hw_ops *hw_ops = &pdata->hw_ops;
+    int ret;
 
     if (cmd->base.speed == SPEED_1000 && cmd->base.duplex == DUPLEX_HALF)
         return -EINVAL;
 
     pdata->phy_autoeng = cmd->base.autoneg;
+    pdata->phy_duplex = cmd->base.duplex;
+    pdata->phy_speed = cmd->base.speed;
 
     ethtool_convert_link_mode_to_legacy_u32(&advertising, cmd->link_modes.advertising);
     ethtool_convert_link_mode_to_legacy_u32(&support, cmd->link_modes.supported);
     advertising &= support;
 
     if (pdata->phy_autoeng || (!pdata->phy_autoeng && cmd->base.speed == SPEED_1000)){
-        ret = hw_ops->read_ephy_reg(pdata, REG_MII_ADVERTISE, &adv);
+        pdata->expansion.phy_link = false;
+        //pdata->phy_autoeng = AUTONEG_ENABLE;
+        ret = hw_ops->phy_config(pdata);
         if (ret < 0)
-            return ret;
-        adv &= ~REG_BIT_ADVERTISE_100_10_CAP;
-        adv |= ethtool_adv_to_mii_adv_t(advertising);
-        ret = hw_ops->write_ephy_reg(pdata, REG_MII_ADVERTISE, adv);
-        if (ret < 0)
-            return ret;
-        ret = hw_ops->read_ephy_reg(pdata, REG_MII_CTRL1000, &adv);
-        if (ret < 0)
-            return ret;
-        adv &= ~REG_BIT_ADVERTISE_1000_CAP;
-        adv |= ethtool_adv_to_mii_ctrl1000_t(advertising);
-        ret = hw_ops->write_ephy_reg(pdata, REG_MII_CTRL1000, adv);
-        if (ret < 0)
-            return ret;
-
-        ret = hw_ops->read_ephy_reg(pdata, REG_MII_BMCR, &adv);
-        if (ret < 0)
-            return ret;
-        adv = FXGMAC_SET_REG_BITS(adv, PHY_CR_AUTOENG_POS, PHY_CR_AUTOENG_LEN, 1);
-        ret = hw_ops->write_ephy_reg(pdata, REG_MII_BMCR, adv);
-        if (ret < 0)
-            return ret;
-
-        ret = hw_ops->read_ephy_reg(pdata, REG_MII_BMCR, &adv);
-        if (ret < 0)
-            return ret;
-        adv = FXGMAC_SET_REG_BITS(adv, PHY_CR_RE_AUTOENG_POS, PHY_CR_RE_AUTOENG_LEN, 1);
-        ret = hw_ops->write_ephy_reg(pdata, REG_MII_BMCR, adv);
-        if (ret < 0)
-            return ret;
+           return ret;
     } else {
-        pdata->phy_duplex = cmd->base.duplex;
-        pdata->phy_speed = cmd->base.speed;
         fxgmac_phy_force_mode(pdata);
     }
 
@@ -1247,10 +1231,12 @@ static void fxgmac_ethtool_get_ethtool_stats(struct net_device *netdev,
     }
 }
 
+#if 0
 static inline bool fxgmac_removed(void __iomem *addr)
 {
     return unlikely(!addr);
 }
+#endif
 
 static int fxgmac_ethtool_reset(struct net_device *netdev, u32 *flag)
 {

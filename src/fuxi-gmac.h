@@ -19,8 +19,8 @@
 #ifndef __FXGMAC_GMAC_H__
 #define __FXGMAC_GMAC_H__
 
-#include "fuxi-errno.h"
 #include "fuxi-os.h"
+#include "fuxi-errno.h"
 
 // For fpga before 20210507
 #define FXGMAC_FPGA_VER_B4_0507     0
@@ -367,7 +367,7 @@ struct fxgmac_desc_data {
     struct fxgmac_rx_desc_data  rx;
 
     unsigned int                mapped_as_page;
-
+#if 0
     /* Incomplete receive save location.  If the budget is exhausted
      * or the last descriptor (last normal descriptor or a following
      * context descriptor) has not been DMA'd yet the current state
@@ -379,6 +379,7 @@ struct fxgmac_desc_data {
         unsigned int            len;
         unsigned int            error;
     } state;
+#endif
 };
 
 struct fxgmac_ring {
@@ -463,7 +464,7 @@ struct fxgmac_desc_ops {
     void (*unmap_desc_data)(struct fxgmac_pdata* pdata,
         struct fxgmac_desc_data* desc_data);
     void (*tx_desc_init)(struct fxgmac_pdata* pdata);
-    void (*rx_desc_init)(struct fxgmac_pdata* pdata);
+    int (*rx_desc_init)(struct fxgmac_pdata* pdata);
     /* For descriptor related operation */
     void (*tx_desc_init_channel)(struct fxgmac_channel* channel);
     void (*rx_desc_init_channel)(struct fxgmac_channel* channel);
@@ -489,6 +490,8 @@ struct fxgmac_hw_ops {
     void (*enable_rx)(struct fxgmac_pdata* pdata);
     void (*disable_rx)(struct fxgmac_pdata* pdata);
     void (*enable_channel_rx)(struct fxgmac_pdata* pdata, unsigned int queue);
+    void (*enable_rx_tx_ints)(struct fxgmac_pdata* pdata);
+    void (*disable_rx_tx_ints)(struct fxgmac_pdata* pdata);
 
     int (*enable_int)(struct fxgmac_channel* channel,
         enum fxgmac_int int_id);
@@ -502,6 +505,8 @@ struct fxgmac_hw_ops {
     void (*disable_msix_one_interrupt)(struct fxgmac_pdata* pdata, u32 intid);
     bool (*enable_mgm_interrupt)(struct fxgmac_pdata* pdata);
     bool (*disable_mgm_interrupt)(struct fxgmac_pdata* pdata);
+    bool (*enable_source_interrupt)(struct fxgmac_pdata* pdata);
+    bool (*disable_source_interrupt)(struct fxgmac_pdata* pdata);
     int  (*dismiss_all_int)(struct fxgmac_pdata* pdata);
     void (*clear_misc_int_status)(struct fxgmac_pdata* pdata);
 
@@ -878,6 +883,9 @@ struct fxgmac_pdata {
     FXGMAC_PDATA_OF_PLATFORM        expansion;
 
     u32                             pcie_link_status;
+    u32                             mgmt_phy_val;
+
+    u32                             support_10m_link;
 };
 
 #if 1

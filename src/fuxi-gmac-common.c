@@ -26,20 +26,27 @@ module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug, "FUXI ethernet debug level (0=none,...,16=all)");
 
 
-static unsigned char dev_addr[6] = {0, 0x55, 0x7b, 0xb5, 0x7d, 0xf7};
-
-static void fxgmac_read_mac_addr(struct fxgmac_pdata *pdata)
+static int fxgmac_read_mac_addr(struct fxgmac_pdata *pdata)
 {
     struct net_device *netdev = pdata->netdev;
     struct fxgmac_hw_ops *hw_ops = &pdata->hw_ops;
+    unsigned char dev_addr[6] = {0, 0x55, 0x7b, 0xb5, 0x7d, 0xf7};
+    int ret;
     /* DPRINTK("read mac from eFuse\n");  */
 
     /* if efuse have mac addr,use it.if not,use static mac address. */
-    hw_ops->read_mac_subsys_from_efuse(pdata, pdata->mac_addr, NULL, NULL);
+    ret = hw_ops->read_mac_subsys_from_efuse(pdata, pdata->mac_addr, NULL, NULL);
+    if (!ret )
+    {
+        DPRINTK("eFuse mac addr err\n");
+        return -1;
+    }
+
     if (ETH_IS_ZEROADDRESS(pdata->mac_addr)) {
         /* Currently it uses a static mac address for test */
         memcpy(pdata->mac_addr, dev_addr, netdev->addr_len);
     }
+    return 0;
 }
 
 static void fxgmac_default_config(struct fxgmac_pdata *pdata)
@@ -68,7 +75,6 @@ static void fxgmac_default_config(struct fxgmac_pdata *pdata)
     pdata->intr_mod = FXGMAC_INT_MODERATION_ENABLED;
     pdata->crc_check = 1;
 
-    //yzhang, set based on phy status. pdata->phy_speed = SPEED_1000;
     pdata->sysclk_rate = FXGMAC_SYSCLOCK;
     pdata->phy_autoeng = AUTONEG_ENABLE; // default to autoneg
     pdata->phy_duplex = DUPLEX_FULL;
@@ -77,9 +83,15 @@ static void fxgmac_default_config(struct fxgmac_pdata *pdata)
     pdata->expansion.pre_phy_speed = pdata->phy_speed;
     pdata->expansion.pre_phy_duplex = pdata->phy_duplex;
     pdata->expansion.pre_phy_autoneg = pdata->phy_autoeng;
-
+    pdata->expansion.recover_phy_state = 0;
     // default to magic
     pdata->expansion.wol = WAKE_MAGIC;
+
+#ifdef FXGMAC_ASPM_ENABLED
+    pdata->expansion.recover_from_aspm = false;
+    pdata->expansion.aspm_en = false;
+    pdata->expansion.aspm_work_active = false;
+#endif
 
     strscpy(pdata->drv_name, FXGMAC_DRV_NAME, sizeof(pdata->drv_name));
     strscpy(pdata->drv_ver, FXGMAC_DRV_VERSION, sizeof(pdata->drv_ver));
@@ -99,7 +111,7 @@ int fxgmac_init(struct fxgmac_pdata *pdata, bool save_private_reg)
 {
     struct fxgmac_hw_ops *hw_ops = &pdata->hw_ops;
     struct net_device *netdev = pdata->netdev;
-    unsigned int i,dma_width;
+    unsigned int i;
     int ret;
 
     /* Set all the function pointers */
@@ -111,7 +123,10 @@ int fxgmac_init(struct fxgmac_pdata *pdata, bool save_private_reg)
     /* Set irq, base_addr, MAC address, */
     netdev->irq = pdata->dev_irq;
     netdev->base_addr = (unsigned long)pdata->base_mem;
-    fxgmac_read_mac_addr(pdata);
+    ret = fxgmac_read_mac_addr(pdata);
+    if (ret < 0)
+        return ret;
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,17,0))
     eth_hw_addr_set(netdev, pdata->mac_addr);
 #else
@@ -129,19 +144,16 @@ int fxgmac_init(struct fxgmac_pdata *pdata, bool save_private_reg)
     fxgmac_get_all_hw_features(pdata);
     fxgmac_print_all_hw_features(pdata);
 
-    /* TODO: Set the PHY mode to XLGMII */
-
     /* Set the DMA mask */
-#ifdef CONFIG_ARM64
-    dma_width = FXGMAC_DMA_BIT_MASK;
-#else
-    dma_width = pdata->hw_feat.dma_width;
-#endif
     ret = dma_set_mask_and_coherent(pdata->dev,
-        DMA_BIT_MASK(dma_width));
+        DMA_BIT_MASK(FXGMAC_DMA_BIT_MASK64));
     if (ret) {
-        dev_err(pdata->dev, "dma_set_mask_and_coherent failed\n");
-        return ret;
+        ret = dma_set_mask_and_coherent(pdata->dev,
+            DMA_BIT_MASK(FXGMAC_DMA_BIT_MASK32));
+        if (ret) {
+            dev_err(pdata->dev, "dma_set_mask_and_coherent failed\n");
+            return ret;
+        }
     }
 
     /* Channel and ring params initializtion
@@ -427,7 +439,7 @@ enable_msi_interrupt:
         dev_info(pdata->dev, "enable MSI ok, cpu=%d, irq=%d.\n", vectors, pdata->pdev->irq);
     }
 #else
-    pdata = pdata;
+   (void)pdata;
 #endif
 }
 

@@ -103,7 +103,7 @@ bool fxgmac_read_mac_subsys_from_efuse(struct fxgmac_pdata* pdata, u8* mac_addr,
     bool succeed = true;
     u8 index = 0;
 
-    for (index = 0; ; index++) {
+    for (index = 0; index < FXGMAC_EFUSE_MAX_ENTRY; index++) {
         if (!fxgmac_read_patch_from_efuse_per_index(pdata, index, &offset, &value)) {
             succeed = false;
             break; // reach the last item.
@@ -179,7 +179,7 @@ bool fxgmac_efuse_read_data(struct fxgmac_pdata* pdata, u32 offset, u32 __far* v
 }
 
 #ifndef COMMENT_UNUSED_CODE_TO_REDUCE_SIZE
-bool fxgmac_read_patch_from_efuse(struct fxgmac_pdata* pdata, u32 offset, u32* value) /* read patch per index. */
+bool fxgmac_read_patch_from_efuse(struct fxgmac_pdata* pdata, u32 offset, u32* value)
 {
     u32 reg_offset, reg_val;
     u32 cur_val = 0;
@@ -306,7 +306,7 @@ bool fxgmac_write_patch_to_efuse(struct fxgmac_pdata* pdata, u32 offset, u32 val
         return false;
     }
 
-    for (index = 0; ; index++) {
+    for (index = 0; index < FXGMAC_EFUSE_MAX_ENTRY; index++) {
         if (!fxgmac_read_patch_from_efuse_per_index(pdata, index, &reg_offset, &reg_val)) {
             return false;
         } else if (reg_offset == offset) {
@@ -382,6 +382,7 @@ bool fxgmac_write_mac_subsys_to_efuse(struct fxgmac_pdata* pdata, u8* mac_addr, 
 #ifdef DBG
     u32 machr = 0, maclr = 0;
 #endif
+    u32 cur_subsysid = 0;
     u32 pcie_cfg_ctrl= PCIE_CFG_CTRL_DEFAULT_VAL;
     bool succeed = true;
     if (mac_addr) {
@@ -405,16 +406,22 @@ bool fxgmac_write_mac_subsys_to_efuse(struct fxgmac_pdata* pdata, u8* mac_addr, 
         }
     }
     if (subsys) {
-        pcie_cfg_ctrl = FXGMAC_SET_REG_BITS(pcie_cfg_ctrl, MGMT_PCIE_CFG_CTRL_CS_EN_POS, MGMT_PCIE_CFG_CTRL_CS_EN_LEN, 1);
-        if (!fxgmac_write_patch_to_efuse(pdata, MGMT_PCIE_CFG_CTRL, pcie_cfg_ctrl)){
-            succeed = false;
-        }
-        if(!fxgmac_write_patch_to_efuse(pdata, EFUSE_SUBSYS_REGISTER, *subsys)){
-            succeed = false;
-        }
-        pcie_cfg_ctrl = FXGMAC_SET_REG_BITS(pcie_cfg_ctrl, MGMT_PCIE_CFG_CTRL_CS_EN_POS, MGMT_PCIE_CFG_CTRL_CS_EN_LEN, 0);
-        if (!fxgmac_write_patch_to_efuse(pdata, MGMT_PCIE_CFG_CTRL, pcie_cfg_ctrl)){
-            succeed = false;
+        if (!fxgmac_read_mac_subsys_from_efuse(pdata, NULL, &cur_subsysid, NULL))
+            return false;
+
+        if (cur_subsysid != *subsys)
+        {           
+            pcie_cfg_ctrl = FXGMAC_SET_REG_BITS(pcie_cfg_ctrl, MGMT_PCIE_CFG_CTRL_CS_EN_POS, MGMT_PCIE_CFG_CTRL_CS_EN_LEN, 1);
+            if (!fxgmac_write_patch_to_efuse(pdata, MGMT_PCIE_CFG_CTRL, pcie_cfg_ctrl)) {
+                succeed = false;
+            }
+            if (!fxgmac_write_patch_to_efuse(pdata, EFUSE_SUBSYS_REGISTER, *subsys)) {
+                succeed = false;
+            }
+            pcie_cfg_ctrl = FXGMAC_SET_REG_BITS(pcie_cfg_ctrl, MGMT_PCIE_CFG_CTRL_CS_EN_POS, MGMT_PCIE_CFG_CTRL_CS_EN_LEN, 0);
+            if (!fxgmac_write_patch_to_efuse(pdata, MGMT_PCIE_CFG_CTRL, pcie_cfg_ctrl)) {
+                succeed = false;
+            }
         }
     }
     return succeed;
@@ -451,7 +458,7 @@ bool fxgmac_read_subsys_from_efuse(struct fxgmac_pdata* pdata, u32* subsys, u32*
     u8 index;
     bool succeed = true;
 
-    for (index = 0; ; index++) {
+    for (index = 0; index < FXGMAC_EFUSE_MAX_ENTRY; index++) {
         if (!fxgmac_read_patch_from_efuse_per_index(pdata, index, &offset, &value)) {
             succeed = false;
             break; // reach the last item.

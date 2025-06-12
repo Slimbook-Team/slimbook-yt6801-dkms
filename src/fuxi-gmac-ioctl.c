@@ -193,7 +193,7 @@ static void fxgmac_dbg_rx_pkt(struct fxgmac_pdata *pdata, u8 *pcmd_data)
 }
 
 // Based on the current application scenario,we only use CMD_DATA for data.
-// if you use other struct, you should recalculate in_total_size 
+// if you use other struct, you should recalculate in_total_size
 long fxgmac_netdev_ops_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
     bool ret = true;
@@ -212,25 +212,25 @@ long fxgmac_netdev_ops_ioctl(struct file *file, unsigned int cmd, unsigned long 
 
     if (!arg) {
         DPRINTK("[%s] command arg is %lx !\n", __func__, arg);
-        goto err; 
+        goto err;
     }
 
     /* check device type */
     if (_IOC_TYPE(cmd) != IOC_MAGIC) {
         DPRINTK("[%s] command type [%c] error!\n", __func__, _IOC_TYPE(cmd));
-        goto err; 
+        goto err;
     }
 
     /* check command number*/
-    if (_IOC_NR(cmd) > IOC_MAXNR) { 
+    if (_IOC_NR(cmd) > IOC_MAXNR) {
         DPRINTK("[%s] command number [%d] exceeded!\n", __func__, _IOC_NR(cmd));
-        goto err; 
+        goto err;
     }
 
     //buf = (u8*)kzalloc(FXGMAC_MAX_DBG_BUF_LEN, GFP_KERNEL);
     if(copy_from_user(&pcmd, (void*)arg, ioctl_cmd_size)) {
         DPRINTK("copy data from user fail... \n");
-        goto err; 
+        goto err;
     }
 
     in_total_size = pcmd.cmd_buf.size_in;
@@ -243,7 +243,7 @@ long fxgmac_netdev_ops_ioctl(struct file *file, unsigned int cmd, unsigned long 
 
     if(copy_from_user(buf, (void*)arg, in_total_size)) {
         DPRINTK("copy data from user fail... \n");
-        goto err; 
+        goto err;
     }
     data = buf + ioctl_cmd_size;
 
@@ -252,12 +252,15 @@ long fxgmac_netdev_ops_ioctl(struct file *file, unsigned int cmd, unsigned long 
         /* ioctl diag begin */
         case FXGMAC_DFS_IOCTL_DIAG_BEGIN:
             DPRINTK("Debugfs received diag begin command.\n");
+#ifdef FXGMAC_EPHY_LOOPBACK_DETECT_ENABLED
+            pdata->expansion.lb_test_flag = 1;
+#endif
             if (netif_running(pdata->netdev)){
                 fxgmac_restart_dev(pdata);
             }
 
             /* release last loopback test abnormal exit buffer */
-            while(ex->fxgmac_test_skb_arr_in_index != 
+            while(ex->fxgmac_test_skb_arr_in_index !=
                                             ex->fxgmac_test_skb_arr_out_index)
             {
                 tmpskb = ex->fxgmac_test_skb_array[ex->fxgmac_test_skb_arr_out_index];
@@ -285,6 +288,9 @@ long fxgmac_netdev_ops_ioctl(struct file *file, unsigned int cmd, unsigned long 
             if (netif_running(pdata->netdev)){
                 fxgmac_restart_dev(pdata);
             }
+#ifdef FXGMAC_EPHY_LOOPBACK_DETECT_ENABLED
+            pdata->expansion.lb_test_flag = 0;
+#endif
             break;
 
         /* ioctl diag tx pkt */
@@ -334,8 +340,8 @@ long fxgmac_netdev_ops_ioctl(struct file *file, unsigned int cmd, unsigned long 
             memcpy(&ex_data, data, sizeof(CMD_DATA));
             ret = hw_ops->read_efuse_data(pdata, ex_data.val0, &ex_data.val1);
             /*
-             * DPRINTK("FXGMAC_EFUSE_READ_REGIONABC, address = 0x%x, val = 0x%x\n", 
-             *    ex_data.val0, 
+             * DPRINTK("FXGMAC_EFUSE_READ_REGIONABC, address = 0x%x, val = 0x%x\n",
+             *    ex_data.val0,
              *    ex_data.val1);
              */
             if (ret) {
@@ -349,8 +355,8 @@ long fxgmac_netdev_ops_ioctl(struct file *file, unsigned int cmd, unsigned long 
         case FXGMAC_EFUSE_WRITE_PATCH_REG:
             memcpy(&ex_data, data, sizeof(CMD_DATA));
             /*
-             * DPRINTK("FXGMAC_EFUSE_WRITE_PATCH_REG, address = 0x%x, val = 0x%x\n", 
-             *    ex_data.val0, 
+             * DPRINTK("FXGMAC_EFUSE_WRITE_PATCH_REG, address = 0x%x, val = 0x%x\n",
+             *    ex_data.val0,
              *    ex_data.val1);
              */
             ret = hw_ops->write_patch_to_efuse(pdata, ex_data.val0, ex_data.val1);
@@ -360,7 +366,7 @@ long fxgmac_netdev_ops_ioctl(struct file *file, unsigned int cmd, unsigned long 
             memcpy(&ex_data, data, sizeof(CMD_DATA));
             ret = hw_ops->read_patch_from_efuse(pdata, ex_data.val0, &ex_data.val1);
             /*
-             * DPRINTK("FXGMAC_EFUSE_READ_PATCH_REG, address = 0x%x, val = 0x%x\n", 
+             * DPRINTK("FXGMAC_EFUSE_READ_PATCH_REG, address = 0x%x, val = 0x%x\n",
              *    ex_data.val0, ex_data.val1);
              */
             if (ret) {
@@ -377,7 +383,7 @@ long fxgmac_netdev_ops_ioctl(struct file *file, unsigned int cmd, unsigned long 
                                                             ex_data.val1,
                                                             ex_data.val2);
             /*
-             * DPRINTK("FXGMAC_EFUSE_WRITE_PATCH_PER_INDEX, index = %d, address = 0x%x, val = 0x%x\n", 
+             * DPRINTK("FXGMAC_EFUSE_WRITE_PATCH_PER_INDEX, index = %d, address = 0x%x, val = 0x%x\n",
              *            ex_data.val0, ex_data.val1, ex_data.val2);
              */
             break;
@@ -388,7 +394,7 @@ long fxgmac_netdev_ops_ioctl(struct file *file, unsigned int cmd, unsigned long 
                                                             &ex_data.val1,
                                                             &ex_data.val2);
             /*
-             * DPRINTK("FXGMAC_EFUSE_READ_PATCH_PER_INDEX, address = 0x%x, val = 0x%x\n", 
+             * DPRINTK("FXGMAC_EFUSE_READ_PATCH_PER_INDEX, address = 0x%x, val = 0x%x\n",
              *    ex_data.val1, ex_data.val2);
              */
             if (ret) {
@@ -543,7 +549,7 @@ long fxgmac_netdev_ops_ioctl(struct file *file, unsigned int cmd, unsigned long 
             DPRINTK("Debugfs received invalid command: %x.\n", pcmd.cmd_type);
             ret = false;
             break;
-        }   
+        }
     }
 
     if (buf)

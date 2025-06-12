@@ -61,18 +61,16 @@ static void fxgmac_remove(struct pci_dev *pcidev)
 {
     struct net_device *netdev;
     struct fxgmac_pdata *pdata;
-    u32 msix;
+    (void)pdata;
 
     netdev = dev_get_drvdata(&pcidev->dev);
     pdata = netdev_priv(netdev);
-    msix = FXGMAC_GET_REG_BITS(pdata->expansion.int_flags,
-                                    FXGMAC_FLAG_MSIX_POS,
-                                    FXGMAC_FLAG_MSIX_LEN);
 
     fxgmac_drv_remove(&pcidev->dev);
 
 #ifdef CONFIG_PCI_MSI
-    if(msix){
+    if(FXGMAC_GET_REG_BITS(pdata->expansion.int_flags, FXGMAC_FLAG_MSIX_POS,
+                           FXGMAC_FLAG_MSIX_LEN)){
         pci_disable_msix(pcidev);
         kfree(pdata->expansion.msix_entries);
         pdata->expansion.msix_entries = NULL;
@@ -162,6 +160,12 @@ static int fxgmac_suspend(struct pci_dev *pdev,
         goto unlock;
 
     if (netif_running(netdev)) {
+ #ifdef FXGMAC_ASPM_ENABLED
+        fxgmac_cancel_aspm_config_work(pdata);
+        pdata->expansion.aspm_en = false;
+        pdata->expansion.aspm_work_active = false;
+        pdata->expansion.recover_from_aspm = false;
+#endif
         retval = __fxgmac_shutdown(pdev, &wake);
         if (retval)
             goto unlock;
@@ -177,6 +181,7 @@ static int fxgmac_suspend(struct pci_dev *pdev,
         pci_set_power_state(pdev, PCI_D3hot);
     }
 
+    pdata->expansion.recover_phy_state = 1;
     pdata->expansion.dev_state = FXGMAC_DEV_SUSPEND;
     DPRINTK("fxpm, fxgmac_suspend callout to %s\n", wake ? "sleep" : "D3hot");
 
