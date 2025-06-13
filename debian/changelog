@@ -1,3 +1,9 @@
+slimbook-yt6801-dkms (1.0.30+slimbook0) noble; urgency=medium
+
+  * Merged with upstream 1.0.30
+
+ -- Slimbook <dev@slimbook.es>  Fri, 13 Jun 2025 08:49:10 +0200
+
 slimbook-yt6801-dkms (1.0.29+slimbook7) noble; urgency=medium
 
   * Fix deprecated function on 6.15 kernels
