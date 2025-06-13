@@ -92,7 +92,7 @@ struct fxgmac_ring;
 struct fxgmac_pdata;
 struct fxgmac_channel;
 
-#define FXGMAC_DRV_VERSION                  "1.0.29"
+#define FXGMAC_DRV_VERSION                  "1.0.30"
 
 #ifdef CONFIG_PCI_MSI
 /* undefined for legacy interrupt mode */
@@ -150,13 +150,8 @@ struct fxgmac_channel;
 #define FXGMAC_TX_HANG_CHECH_DIRTY	0
 #endif
 
-#ifdef CONFIG_ARM64
-/*
- * when you want to run this driver on 64bit arm,you should open this,otherwise
- * dma's mask cannot be set successfully.
- */
-#define FXGMAC_DMA_BIT_MASK       64
-#endif
+#define FXGMAC_DMA_BIT_MASK64       64
+#define FXGMAC_DMA_BIT_MASK32       32
 
 #ifdef CONFIG_PCI_MSI
 /* should be same as FXGMAC_MAX_DMA_CHANNELS + 1 tx_irq */
@@ -164,8 +159,12 @@ struct fxgmac_channel;
 #define FXGMAC_MSIX_CH0RXDIS_ENABLED		0 //set to 1 for ch0 unbalance fix;
 #define FXGMAC_MSIX_INTCTRL_EN      1
 
-#define FXGMAC_PHY_INT_NUM          1
-#define FXGMAC_MSIX_INT_NUMS (FXGMAC_MAX_MSIX_Q_VECTORS + FXGMAC_PHY_INT_NUM)
+#ifdef FXGMAC_MISC_NOT_ENABLED
+#define FXGMAC_MISC_INT_NUM          0
+#else
+#define FXGMAC_MISC_INT_NUM          1
+#endif
+#define FXGMAC_MSIX_INT_NUMS (FXGMAC_MAX_MSIX_Q_VECTORS + FXGMAC_MISC_INT_NUM)
 #else
 #define FXGMAC_MSIX_CH0RXDIS_ENABLED		0   /* NO modification needed! for non-MSI, set to 0 always */
 #define FXGMAC_MSIX_INTCTRL_EN      0
@@ -236,6 +235,8 @@ struct fxgmac_channel;
 #define FXGMAC_WAIT_RX_STOP_BY_PRXQ_RXQSTS
 
 #define FXGMAC_USE_DEFAULT_RSS_KEY_TBALE
+
+#define FXGMAC_MISC_NOT_ENABLED
 
 #define FXGMAC_RX_VLAN_FILTERING_ENABLED  (pdata->netdev->features & NETIF_F_HW_VLAN_CTAG_FILTER)
 
@@ -401,7 +402,7 @@ struct fxgmac_channel;
 #define DbgPrintOidName(_Oid)
 #define DbgPrintAddress(_pAddress)
 
-#define fxgmac_dump_buffer(_skb, _len, _tx_rx)
+// #define fxgmac_dump_buffer(_skb, _len, _tx_rx)
 #define DumpLine(_p, _cbLine, _fAddress, _ulGroup )
 
 #ifndef __far
@@ -478,7 +479,7 @@ struct fxgmac_channel;
 #define FXGAMC_MAX_DATA_SIZE (1024 * 4 + 16)
 
 #ifndef PCI_CAP_ID_MSI
-#define PCI_CAP_ID_MSI     0x05    /* Message Signalled Interrupts */
+#define PCI_CAP_ID_MSI      0x05    /* Message Signalled Interrupts */
 #endif
 
 #ifndef PCI_CAP_ID_MSIX
@@ -487,8 +488,8 @@ struct fxgmac_channel;
 
 #define PCI_CAP_ID_MSI_ENABLE_POS   0x10
 #define PCI_CAP_ID_MSI_ENABLE_LEN   0x1
-#define PCI_CAP_ID_MSIX_ENABLE_POS   0x1F
-#define PCI_CAP_ID_MSIX_ENABLE_LEN   0x1
+#define PCI_CAP_ID_MSIX_ENABLE_POS  0x1F
+#define PCI_CAP_ID_MSIX_ENABLE_LEN  0x1
 
 #define FXGMAC_IRQ_ENABLE       0x1
 #define FXGMAC_IRQ_DISABLE      0x0
@@ -522,6 +523,18 @@ struct fxgmac_channel;
 #define FXGMAC_PCIE_LINK_DOWN   0xFFFFFFFF
 #define FXGMAC_PCIE_RECOVER_TIMES 5000
 #define FXGMAC_PCIE_IO_MEM_MASTER_ENABLE 0x7
+#endif
+
+//#define FXGMAC_EPHY_LOOPBACK_DETECT_ENABLED
+#ifdef FXGMAC_EPHY_LOOPBACK_DETECT_ENABLED
+#define FXGMAC_LOOPBACK_CHECK_INTERVAL     (5 * HZ)
+#define FXGMAC_PHY_LOOPBACK_DETECT_THRESOLD 2
+#endif
+
+//#define FXGMAC_ASPM_ENABLED
+#ifdef FXGMAC_ASPM_ENABLED
+#define FXGMAC_CHECK_DEV_STATE
+#define FXGMAC_ASPM_INTERVAL                (20 * HZ)
 #endif
 
 #ifndef BIT
@@ -703,6 +716,21 @@ typedef struct fxgmac_pdata_of_platform
     FXGMAC_ESD_STATS                esd_stats;
     DECLARE_BITMAP(task_flags, FXGMAC_FLAG_TASK_MAX);
 #endif
+
+#ifdef FXGMAC_EPHY_LOOPBACK_DETECT_ENABLED
+    struct delayed_work             loopback_work;
+    u32                             lb_test_flag;  // for tool
+    u32                             lb_cable_flag;  // for driver
+    u32                             lb_cable_detect_count;  // for driver
+#endif
+
+#ifdef FXGMAC_ASPM_ENABLED
+    struct delayed_work             aspm_config_work;
+    bool                            aspm_en;
+    bool                            aspm_work_active;
+#endif
+    bool                            recover_from_aspm;
+
     u32                             int_flags; /* legacy, msi or msix */
     int                             misc_irq;
 #ifdef CONFIG_PCI_MSI
@@ -716,9 +744,11 @@ typedef struct fxgmac_pdata_of_platform
     unsigned int                    ns_offload_tab_idx;
     netdev_features_t               netdev_features;
     struct napi_struct              napi;
+#ifndef FXGMAC_MISC_NOT_ENABLED
     struct napi_struct              napi_misc;
+#endif
+    u8                              recover_phy_state;
     char                            misc_irq_name[IFNAMSIZ + 32];
-    u32                             mgm_intctrl_val;
     bool                            phy_link;
     bool                            fxgmac_test_tso_flag;
     u32                             fxgmac_test_tso_seg_num;
@@ -740,8 +770,11 @@ long fxgmac_netdev_ops_ioctl(struct file *file, unsigned int cmd,
 
 int  fxgmac_init(struct fxgmac_pdata *pdata, bool save_private_reg);
 /* for phy interface */
+#if 0
 int  fxgmac_ephy_autoneg_ability_get(struct fxgmac_pdata *pdata,
                                         unsigned int *cap_mask);
+#endif
+
 int  fxgmac_ephy_status_get(struct fxgmac_pdata *pdata, int* speed,
                                 int* duplex, int* ret_link, int *media);
 int  fxgmac_ephy_soft_reset(struct fxgmac_pdata *pdata);
@@ -752,6 +785,7 @@ int fxgmac_phy_force_autoneg(struct fxgmac_pdata *pdata, int autoneg);
 //void fxgmac_act_phy_link(struct fxgmac_pdata *pdata);
 int  fxgmac_phy_timer_init(struct fxgmac_pdata *pdata);
 void fxgmac_phy_timer_destroy(struct fxgmac_pdata *pdata);
+void fxgmac_phy_update_link(struct net_device *netdev);
 
 unsigned int    fxgmac_get_netdev_ip4addr(struct fxgmac_pdata *pdata);
 unsigned char * fxgmac_get_netdev_ip6addr(struct fxgmac_pdata *pdata,
@@ -780,6 +814,12 @@ void fxgmac_lock(struct fxgmac_pdata * pdata);
 void fxgmac_unlock(struct fxgmac_pdata * pdata);
 
 void fxgmac_set_phy_link_ksettings(struct fxgmac_pdata *pdata);
+
+#ifdef FXGMAC_ASPM_ENABLED
+void fxgmac_schedule_aspm_config_work(struct fxgmac_pdata *pdata);
+void fxgmac_cancel_aspm_config_work(struct fxgmac_pdata *pdata);
+bool fxgmac_aspm_action_linkup(struct fxgmac_pdata *pdata);
+#endif
 
 #endif /* __FXGMAC_OS_H__ */
 
