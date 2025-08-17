@@ -323,7 +323,11 @@ static void fxgmac_phy_link_poll(unsigned long data)
 #endif
 {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,15,0))
+    #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,16,0))
+    struct fxgmac_pdata *pdata = timer_container_of(pdata, t, expansion.phy_poll_tm);
+    #else
     struct fxgmac_pdata *pdata = from_timer(pdata, t, expansion.phy_poll_tm);
+    #endif
 #else
     struct fxgmac_pdata *pdata = (struct fxgmac_pdata*)data;
 #endif
@@ -351,7 +355,11 @@ static void fxgmac_phy_link_poll(unsigned long data)
 int fxgmac_phy_timer_init(struct fxgmac_pdata *pdata)
 {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,15,0))
+    #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,16,0))
+    timer_init_key(&pdata->expansion.phy_poll_tm, NULL, 0, "fuxi_phy_link_update_timer", NULL);
+    #else
     init_timer_key(&pdata->expansion.phy_poll_tm, NULL, 0, "fuxi_phy_link_update_timer", NULL);
+    #endif
 #else
     init_timer_key(&pdata->expansion.phy_poll_tm, 0, "fuxi_phy_link_update_timer", NULL);
 #endif
