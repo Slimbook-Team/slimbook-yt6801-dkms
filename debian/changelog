@@ -1,3 +1,9 @@
+slimbook-yt6801-dkms (1.0.30+slimbook1) noble; urgency=medium
+
+  * Added support for 6.16 kernels
+
+ -- Slimbook <dev@slimbook.es>  Sun, 17 Aug 2025 23:57:53 +0200
+
 slimbook-yt6801-dkms (1.0.30+slimbook0) noble; urgency=medium
 
   * Merged with upstream 1.0.30
