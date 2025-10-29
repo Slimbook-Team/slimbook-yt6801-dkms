@@ -1915,7 +1915,8 @@ static void fxgmac_dump_state(struct fxgmac_pdata *pdata)
 	DPRINTK( "mgmt_int_isr %lld\n", pstats->mgmt_int_isr);
 }
 
-#if ((LINUX_VERSION_CODE > KERNEL_VERSION(4,0,0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(5,6,0) || (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,8))))
+
+#if ((LINUX_VERSION_CODE > KERNEL_VERSION(4,0,0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(5,6,0) || (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,8)) && (RHEL_RELEASE_CODE <= RHEL_RELEASE_VERSION(10,0))))
 static void fxgmac_tx_timeout(struct net_device *netdev)
 #else
 static void fxgmac_tx_timeout(struct net_device *netdev, unsigned int unused)
