@@ -1,3 +1,9 @@
+slimbook-yt6801-dkms (1.0.30+slimbook1~alpha0) resolute; urgency=medium
+
+  * 26.04 release
+
+ -- Slimbook <dev@slimbook.es>  Wed, 08 Apr 2026 16:40:44 +0200
+
 slimbook-yt6801-dkms (1.0.30+slimbook1) noble; urgency=medium
 
   * Added support for 6.16 kernels
